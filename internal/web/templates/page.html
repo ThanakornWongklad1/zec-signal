@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Crypto Signals</title>
+<script src="https://unpkg.com/htmx.org@1.9.12"></script>
+<style>
+  :root {
+    --ground: #050706;
+    --green: #00b359;
+    --green-bright: #00cc65;
+    --glass-bg: rgba(255, 255, 255, 0.045);
+    --glass-bg-soft: rgba(255, 255, 255, 0.03);
+    --glass-border: rgba(255, 255, 255, 0.09);
+    --text: #eef2f0;
+    --text-dim: #9aa39d;
+    --red: #ff5c5c;
+    --amber: #ffb454;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { background: var(--ground); }
+
+  body {
+    font: 15px/1.6 -apple-system, "SF Pro Text", system-ui, sans-serif;
+    margin: 0 auto;
+    max-width: 1040px;
+    padding: 3rem 1.5rem 6rem;
+    color: var(--text);
+    background: var(--ground);
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* Parallax glow layer — fixed behind content, drifts on scroll via JS */
+  .glow {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .glow span {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(90px);
+    opacity: 0.28;
+    will-change: transform;
+  }
+  .glow span.a { width: 32rem; height: 32rem; top: -8rem; left: -6rem; background: var(--green); }
+  .glow span.b { width: 26rem; height: 26rem; top: 40%; right: -8rem; background: var(--green-bright); opacity: 0.18; }
+  .glow span.c { width: 22rem; height: 22rem; bottom: -6rem; left: 20%; background: var(--green); opacity: 0.14; }
+
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    margin: 0 0 .3rem;
+    background: linear-gradient(135deg, var(--text) 40%, var(--green-bright));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  h2 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 0 0 .8rem;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+  }
+  h2::before {
+    content: "";
+    width: .5rem;
+    height: .5rem;
+    border-radius: 50%;
+    background: var(--green-bright);
+    box-shadow: 0 0 12px var(--green-bright);
+  }
+
+  .sub { color: var(--text-dim); margin-bottom: 1.5rem; font-size: .9rem; }
+
+  /* Glassmorphism surface — every card on the page shares this */
+  .glass {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 18px;
+    backdrop-filter: blur(24px) saturate(140%);
+    -webkit-backdrop-filter: blur(24px) saturate(140%);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    padding: 1.4rem 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .note {
+    background: linear-gradient(135deg, rgba(0, 179, 89, 0.1), var(--glass-bg-soft));
+    border: 1px solid rgba(0, 204, 101, 0.25);
+    border-radius: 14px;
+    padding: .9rem 1.1rem;
+    margin-bottom: 2rem;
+    font-size: .9rem;
+    color: var(--text-dim);
+    backdrop-filter: blur(16px);
+  }
+
+  table { border-collapse: collapse; width: 100%; margin-bottom: 1.4rem; }
+  th, td { text-align: right; padding: .6rem .7rem; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+  th:first-child, td:first-child { text-align: left; }
+  th {
+    font-weight: 600;
+    color: var(--text-dim);
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  tbody tr { transition: background .2s ease; }
+  tbody tr:hover { background: rgba(255, 255, 255, 0.03); }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .LONG { color: var(--green-bright); font-weight: 600; }
+  .SHORT { color: var(--red); font-weight: 600; }
+  .CLOSE { color: var(--amber); font-weight: 600; }
+  .HOLD { color: var(--text-dim); }
+  .pass { color: var(--green-bright); font-weight: 600; }
+  .fail { color: var(--red); font-weight: 600; }
+  .reason { color: var(--text-dim); font-size: .82rem; }
+
+  fieldset {
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    margin: 0 0 1rem;
+    padding: 1rem 1.1rem;
+    background: var(--glass-bg-soft);
+  }
+  fieldset:last-child { margin-bottom: 0; }
+  legend {
+    font-weight: 600;
+    padding: 0 .5rem;
+    color: var(--text);
+    font-size: .85rem;
+  }
+
+  input, select, button {
+    font: inherit;
+    padding: .5rem .7rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    color: var(--text);
+  }
+  input:focus, select:focus, button:focus {
+    outline: none;
+    border-color: var(--green-bright);
+    box-shadow: 0 0 0 3px rgba(0, 204, 101, 0.18);
+  }
+  button {
+    background: linear-gradient(135deg, var(--green), var(--green-bright));
+    border: none;
+    color: #05130b;
+    font-weight: 650;
+    cursor: pointer;
+    transition: filter .15s ease, transform .15s ease;
+  }
+  button:hover { filter: brightness(1.08); transform: translateY(-1px); }
+  button:active { transform: translateY(0); }
+
+  /* Scroll-reveal — elements fade/rise into place; re-armed after htmx swaps */
+  .reveal {
+    opacity: 0;
+    transform: translateY(18px);
+    transition: opacity .7s cubic-bezier(.2, .7, .2, 1), transform .7s cubic-bezier(.2, .7, .2, 1);
+  }
+  .reveal.is-visible { opacity: 1; transform: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; transition: none; }
+    .glow span { display: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="glow" aria-hidden="true"><span class="a"></span><span class="b"></span><span class="c"></span></div>
+
+  <h1 class="reveal">Perpetual Signal Monitor</h1>
+  <div class="sub reveal">15m candles &middot; {{printf "%.0fx" .Leverage}} leverage &middot; per-strategy stops &middot; signals only, never trades</div>
+  <div class="note reveal">This tool never places orders and holds no API keys. Every trade is yours to place manually on the exchange.</div>
+  {{template "panel" .}}
+
+<script>
+(function () {
+  function armReveal(root) {
+    var els = (root || document).querySelectorAll('.reveal:not(.is-visible)');
+    if (!els.length) return;
+    if (!('IntersectionObserver' in window)) {
+      els.forEach(function (el) { el.classList.add('is-visible'); });
+      return;
+    }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible');
+          io.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+    els.forEach(function (el) { io.observe(el); });
+  }
+
+  var glows = document.querySelectorAll('.glow span');
+  function parallax() {
+    var y = window.scrollY || 0;
+    glows.forEach(function (el, i) {
+      var speed = 0.06 + i * 0.05;
+      el.style.transform = 'translateY(' + (y * speed) + 'px)';
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    armReveal(document);
+    parallax();
+  });
+  document.body.addEventListener('htmx:afterSwap', function (e) {
+    armReveal(e.target);
+  });
+  window.addEventListener('scroll', parallax, { passive: true });
+})();
+</script>
+</body>
+</html>

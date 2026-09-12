@@ -1,0 +1,87 @@
+{{define "panel"}}
+<div id="panel" hx-get="/panel" hx-trigger="every 15s" hx-swap="outerHTML">
+  {{range .Sections}}
+  <section class="glass reveal">
+    <h2>{{base .Symbol}}/USDT</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Strategy</th><th>Signal</th><th>Trades</th><th>Win rate</th>
+          <th>Profit factor</th><th>Max DD</th><th>Net P&amp;L</th><th>Gate</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{range .Rows}}
+        <tr>
+          <td>{{.Strategy}}<div class="reason">{{.Reason}}</div></td>
+          <td class="{{.Action}}">{{.Action}}</td>
+          {{if .HasBacktest}}
+            <td>{{.Trades}}</td>
+            <td>{{pct .WinRate}}</td>
+            <td>{{printf "%.2f" .ProfitFactor}}</td>
+            <td>{{pct .MaxDrawdown}}</td>
+            <td>{{printf "%.0f" .NetProfit}}</td>
+            <td class="{{if .Passed}}pass{{else}}fail{{end}}">{{if .Passed}}PASS{{else}}FAIL{{end}}</td>
+          {{else}}
+            <td colspan="6" class="reason">backtest running…</td>
+          {{end}}
+        </tr>
+      {{else}}
+        <tr><td colspan="8" class="reason">no strategies tuned for this symbol</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+
+    <fieldset>
+      <legend>{{base .Symbol}} position (manual)</legend>
+      {{if and (gt $.Equity 0.0) (gt .Price 0.0)}}
+        <div class="reason">
+          Last price {{printf "%.2f" .Price}} &middot; {{pct .StopPct}} stop &rarr;
+          size {{printf "%.4f" .Size.Qty}} {{base .Symbol}}
+          ({{printf "%.2f" .Size.Notional}} USDT notional, {{printf "%.2f" .Size.Margin}} margin),
+          stop {{printf "%.2f" .Size.StopPrice}}, max loss {{printf "%.2f" .Size.MaxLoss}} USDT.
+        </div>
+      {{else}}
+        <div class="reason">Enter your equity below to see position sizing.</div>
+      {{end}}
+      {{with .Position}}
+        <p><strong>{{.Side}}</strong> {{.Strategy}} @ {{printf "%.2f" .EntryPrice}}
+           &middot; opened {{.OpenedAt.Format "2006-01-02 15:04"}} UTC</p>
+        <form hx-post="/position/close" hx-target="#panel" hx-swap="outerHTML">
+          <input type="hidden" name="symbol" value="{{.Symbol}}">
+          <button type="submit">Mark closed</button>
+        </form>
+      {{else}}
+        <form hx-post="/position/open" hx-target="#panel" hx-swap="outerHTML">
+          <input type="hidden" name="symbol" value="{{.Symbol}}">
+          <select name="strategy">
+            {{range .Rows}}<option value="{{.Strategy}}">{{.Strategy}}</option>{{end}}
+          </select>
+          <select name="side"><option value="LONG">LONG</option><option value="SHORT">SHORT</option></select>
+          <input type="number" name="entry_price" step="0.01" min="0" placeholder="entry price" required>
+          <button type="submit">Mark opened</button>
+        </form>
+      {{end}}
+    </fieldset>
+  </section>
+  {{end}}
+
+  <section class="glass reveal">
+    <div class="reason">
+      Gate: profit factor &ge; {{printf "%.1f" .Gate.ProfitFactor}}, expectancy &ge; {{printf "%.2f" .Gate.Expectancy}}R per trade,
+      max drawdown &lt; {{pct .Gate.MaxDrawdown}} — and cleared on both the training window and the
+      out-of-sample holdout, not just overall. Failing strategies stay visible, flagged FAIL.
+    </div>
+  </section>
+
+  <section class="glass reveal">
+    <fieldset>
+      <legend>Account equity (shared across symbols)</legend>
+      <form hx-post="/equity" hx-target="#panel" hx-swap="outerHTML">
+        <label>Equity (USDT) <input type="number" name="equity" step="0.01" min="0" value="{{printf "%.2f" .Equity}}"></label>
+        <button type="submit">Save</button>
+      </form>
+    </fieldset>
+  </section>
+</div>
+{{end}}
