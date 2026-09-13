@@ -46,6 +46,7 @@
       {{end}}
       {{with .Position}}
         <p><strong>{{.Side}}</strong> {{.Strategy}} @ {{printf "%.2f" .EntryPrice}}
+           &middot; {{printf "%.0fx" .Leverage}} leverage
            &middot; opened {{.OpenedAt.Format "2006-01-02 15:04"}} UTC</p>
         <form hx-post="/position/close" hx-target="#panel" hx-swap="outerHTML">
           <input type="hidden" name="symbol" value="{{.Symbol}}">
@@ -59,6 +60,7 @@
           </select>
           <select name="side"><option value="LONG">LONG</option><option value="SHORT">SHORT</option></select>
           <input type="number" name="entry_price" step="0.01" min="0" placeholder="entry price" required>
+          <input type="number" name="leverage" step="1" min="1" placeholder="leverage (x)" required>
           <button type="submit">Mark opened</button>
         </form>
       {{end}}

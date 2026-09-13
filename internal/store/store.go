@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -31,13 +32,16 @@ CREATE TABLE IF NOT EXISTS signals (
   PRIMARY KEY (symbol, strategy)
 );
 CREATE TABLE IF NOT EXISTS positions (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  symbol      TEXT NOT NULL,
-  strategy    TEXT NOT NULL,
-  side        TEXT NOT NULL,
-  entry_price REAL NOT NULL,
-  opened_at   TEXT NOT NULL,
-  closed_at   TEXT
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  symbol            TEXT NOT NULL,
+  strategy          TEXT NOT NULL,
+  side              TEXT NOT NULL,
+  entry_price       REAL NOT NULL,
+  leverage          REAL NOT NULL DEFAULT 1,
+  profit_alert_step INTEGER NOT NULL DEFAULT 0,
+  loss_alert_step   INTEGER NOT NULL DEFAULT 0,
+  opened_at         TEXT NOT NULL,
+  closed_at         TEXT
 );
 CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,
@@ -69,12 +73,15 @@ type Signal struct {
 }
 
 type Position struct {
-	ID         int64
-	Symbol     string
-	Strategy   string
-	Side       string
-	EntryPrice float64
-	OpenedAt   time.Time
+	ID              int64
+	Symbol          string
+	Strategy        string
+	Side            string
+	EntryPrice      float64
+	Leverage        float64
+	ProfitAlertStep int
+	LossAlertStep   int
+	OpenedAt        time.Time
 }
 
 func Open(path string) (*Store, error) {
@@ -135,6 +142,21 @@ func migrate(db *sql.DB) error {
 			return err
 		}
 	}
+
+	posCols := []string{"leverage REAL NOT NULL DEFAULT 1", "profit_alert_step INTEGER NOT NULL DEFAULT 0", "loss_alert_step INTEGER NOT NULL DEFAULT 0"}
+	for _, col := range posCols {
+		name := col[:strings.IndexByte(col, ' ')]
+		has, err := hasColumn(db, "positions", name)
+		if err != nil {
+			return err
+		}
+		if !has {
+			if _, err := db.Exec(`ALTER TABLE positions ADD COLUMN ` + col); err != nil {
+				return err
+			}
+		}
+	}
+
 	_, err = db.Exec(`UPDATE settings SET key = 'last_price:ZECUSDT' WHERE key = 'last_price'`)
 	return err
 }
@@ -246,10 +268,20 @@ func (s *Store) Signals() (map[string]map[string]Signal, error) {
 	return out, rows.Err()
 }
 
-func (s *Store) OpenPosition(symbol, strategy, side string, entry float64) error {
+func (s *Store) OpenPosition(symbol, strategy, side string, entry, leverage float64) error {
 	_, err := s.db.Exec(`
-		INSERT INTO positions (symbol, strategy, side, entry_price, opened_at) VALUES (?, ?, ?, ?, ?)`,
-		symbol, strategy, side, entry, time.Now().UTC().Format(time.RFC3339))
+		INSERT INTO positions (symbol, strategy, side, entry_price, leverage, opened_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		symbol, strategy, side, entry, leverage, time.Now().UTC().Format(time.RFC3339))
+	return err
+}
+
+// SetPositionAlertStep records the furthest 2%-of-leveraged-PnL milestone
+// notified so far, ratcheted separately for the profit and loss directions so
+// a retrace doesn't re-fire an already-seen level.
+func (s *Store) SetPositionAlertStep(id int64, profitStep, lossStep int) error {
+	_, err := s.db.Exec(`
+		UPDATE positions SET profit_alert_step = ?, loss_alert_step = ? WHERE id = ?`,
+		profitStep, lossStep, id)
 	return err
 }
 
@@ -267,9 +299,9 @@ func (s *Store) CurrentPosition(symbol string) (*Position, error) {
 	var p Position
 	var ts string
 	err := s.db.QueryRow(`
-		SELECT id, symbol, strategy, side, entry_price, opened_at
+		SELECT id, symbol, strategy, side, entry_price, leverage, profit_alert_step, loss_alert_step, opened_at
 		FROM positions WHERE closed_at IS NULL AND symbol = ? ORDER BY id DESC LIMIT 1`, symbol).
-		Scan(&p.ID, &p.Symbol, &p.Strategy, &p.Side, &p.EntryPrice, &ts)
+		Scan(&p.ID, &p.Symbol, &p.Strategy, &p.Side, &p.EntryPrice, &p.Leverage, &p.ProfitAlertStep, &p.LossAlertStep, &ts)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}

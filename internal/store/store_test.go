@@ -37,7 +37,7 @@ func TestPositionLifecycleAndEquity(t *testing.T) {
 	if pos, err := st.CurrentPosition("ZECUSDT"); err != nil || pos != nil {
 		t.Fatalf("expected no open position, got %+v err=%v", pos, err)
 	}
-	if err := st.OpenPosition("ZECUSDT", "Trend", "LONG", 1010.5); err != nil {
+	if err := st.OpenPosition("ZECUSDT", "Trend", "LONG", 1010.5, 5); err != nil {
 		t.Fatal(err)
 	}
 	pos, err := st.CurrentPosition("ZECUSDT")
@@ -84,10 +84,10 @@ func TestSymbolsDoNotCollide(t *testing.T) {
 		t.Fatalf("signals collided across symbols: %+v", sigs)
 	}
 
-	if err := st.OpenPosition("ZECUSDT", name, "LONG", 50); err != nil {
+	if err := st.OpenPosition("ZECUSDT", name, "LONG", 50, 5); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.OpenPosition("BTCUSDT", name, "SHORT", 90000); err != nil {
+	if err := st.OpenPosition("BTCUSDT", name, "SHORT", 90000, 20); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.ClosePosition("ZECUSDT"); err != nil {

@@ -8,8 +8,8 @@ Signal bot for ZEC/USDT and BTC/USDT perpetual futures on Binance. Evaluates a s
 
 - Independent strategy evaluation for ZEC and BTC (separate signals, positions, and price baselines per symbol)
 - Seven strategies (trend, mean-reversion, breakout, momentum, regime-trend, VWAP-deviation, squeeze), each backtested with slippage/fee modeling and a walk-forward pass/fail gate (profit factor, expectancy, max drawdown)
-- Telegram alerts (in Thai) on signal changes and on ±0.5% price moves, plus an hourly health check
-- Local dashboard for equity, position sizing, and per-strategy backtest stats — all backed by a local SQLite file
+- Telegram alerts (in Thai) on signal changes, on ±0.5% price moves, and on every 2% leveraged-PnL milestone on an open position, plus an hourly health check
+- Local dashboard for equity, position sizing (with per-position leverage), and per-strategy backtest stats — all backed by a local SQLite file
 
 ## Requirements
 
@@ -43,7 +43,11 @@ go run ./cmd/zec-signal -addr 127.0.0.1:8722 -db zec-signal.db
 
 ## Dashboard
 
-Open `http://127.0.0.1:8722`. For each symbol you can see current signals per strategy, backtest stats (trades, win rate, profit factor, expectancy, max drawdown, pass/fail), and position sizing based on your configured equity. Use the panel to set equity and open/close positions manually as you act on signals.
+Open `http://127.0.0.1:8722`. For each symbol you can see current signals per strategy, backtest stats (trades, win rate, profit factor, expectancy, max drawdown, pass/fail), and position sizing based on your configured equity. Use the panel to set equity and open/close positions manually as you act on signals — opening a position takes the entry price and your leverage, which drives both the sizing math and the PnL alerts below.
+
+## PnL alerts
+
+Once a position is open, the bot polls its live price every 10s and computes leveraged PnL from entry price, side, and leverage. Every time that PnL crosses a new 2% milestone (2%, 4%, 6%, ...) it sends a Thai Telegram alert. Profit and loss milestones ratchet independently, so a retrace doesn't re-fire an already-seen level, and jumping past several levels at once only notifies for the level actually reached.
 
 ## Testing
 

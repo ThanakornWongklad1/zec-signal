@@ -200,6 +200,11 @@ func (s *Server) openPosition(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "entry_price must be a positive number", http.StatusBadRequest)
 		return
 	}
+	leverage, err := strconv.ParseFloat(r.FormValue("leverage"), 64)
+	if err != nil || leverage <= 0 {
+		http.Error(w, "leverage must be a positive number", http.StatusBadRequest)
+		return
+	}
 	name := r.FormValue("strategy")
 	valid := false
 	for _, st := range strategy.For(symbol) {
@@ -211,7 +216,7 @@ func (s *Server) openPosition(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unknown strategy", http.StatusBadRequest)
 		return
 	}
-	if err := s.st.OpenPosition(symbol, name, side, entry); err != nil {
+	if err := s.st.OpenPosition(symbol, name, side, entry, leverage); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
